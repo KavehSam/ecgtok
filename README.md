@@ -48,6 +48,24 @@ Symbol `S` has two beats in the whole set and is not scored on DS2. Nine symbol 
 
 Rhythm DS2, named against opaque: AFIB 0.794 / 0.660, AFL 0.754 / 0.509, VT 0.895 / 0.710, B 0.828 / 0.665, N 0.711 / 0.672, NOD 0.663 / 0.527, SVTA 0.604 / 0.589, T 0.443 / 0.578. Nine rhythm classes are scored on DS1 validation and eight on DS2. Ventricular flutter is annotated in the database, but those annotations do not fall on QRS beats in this table, so flutter is not a class.
 
+## Embedding size and forward cost
+
+The token lists and the block diagram are in [docs/taxonomy.md](docs/taxonomy.md). A named beat is 13 tokens drawn from 49 symbols. An opaque beat is 12 tokens drawn from 612 symbols, twelve segments times the 51 tenths from 0 through 50. The two arms then enter the same network [4].
+
+The learned embedding table has one float32 row of length 1536 for each symbol that occurs in DS1 training, plus `<ECG_UNK>`. In the reported table that is 34 named symbols, so 35 rows, and 363 opaque codes, so 364 rows. Fifteen named symbols never occur in this MIT-BIH table and receive no row: `<QRS_NARROW>`, `<QRS_MEDIUM>`, `<QRS_WIDE>`, `<QRS_VERY_WIDE>`, `<QRS_NOTCHED>`, `<RETROGRADE_P_PRESENT>`, `<ST_ELEVATED>`, `<ST_DEPRESSED>`, `<ST_QRS_CONCORDANT>`, `<ST_QRS_DISCORDANT>`, `<T_POSITIVE>`, `<T_NEGATIVE>`, `<T_FLAT>`, `<T_QRS_CONCORDANT>`, and `<T_QRS_DISCORDANT>`. Every reported duration token is `<QRS_VERY_NARROW>`. Twenty-four opaque codes appear only outside DS1 training and are mapped to `<ECG_UNK>` at evaluation.
+
+| Table | Rows | Bytes |
+|---|---:|---:|
+| Named, reported run | 35 × 1536 | 215,040 (210 KiB) |
+| Opaque, reported run | 364 × 1536 | 2,236,416 (2.13 MiB) |
+| Named, full vocabulary plus the unknown row | 50 × 1536 | 307,200 (300 KiB) |
+| Opaque, full code space plus the unknown row | 613 × 1536 | 3,766,272 (3.59 MiB) |
+| Pretrained Qwen table, float16, frozen, both arms | 151,936 × 1536 | 466,747,392 (445 MiB) |
+
+The opaque table in the reported run is 364/35 ≈ 10.4 times the named table. Next to the frozen 445 MiB table, and next to the roughly 5 GB training footprint at batch 64, those few mebibytes are a small part of the memory.
+
+The forward cost of one beat is Θ(N (L H² + L H F + L² H)), with N = 28, H = 1536, and F = 8960. N, H, and F are the same on both arms. L is 13 for named tokens and 12 for opaque codes. Projections and the SwiGLU therefore cost 13/12 as much on the named arm, and the attention scores cost (13/12)² as much. At this length the linear term is nearly the whole multiply-add count, so a named beat is about 13/12 the work of an opaque beat. LoRA rank 16 on `q_proj` and `v_proj` is the same on both arms. Activation memory scales with L, so it follows the same 13/12 ratio. These figures come from the shapes. The two arms were not timed separately.
+
 ## Reproduce
 
 The database and the weights are downloaded. They are not in git.
