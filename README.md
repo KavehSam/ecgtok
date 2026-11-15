@@ -48,6 +48,23 @@ Symbol `S` has two beats in the whole set and is not scored on DS2. Nine symbol 
 
 Rhythm DS2, named against opaque: AFIB 0.794 / 0.660, AFL 0.754 / 0.509, VT 0.895 / 0.710, B 0.828 / 0.665, N 0.711 / 0.672, NOD 0.663 / 0.527, SVTA 0.604 / 0.589, T 0.443 / 0.578. Nine rhythm classes are scored on DS1 validation and eight on DS2. Ventricular flutter is annotated in the database, but those annotations do not fall on QRS beats in this table, so flutter is not a class.
 
+## Other embeddings
+
+Two further inputs use the same window, the same Qwen2.5-1.5B LoRA, and the same DS1/DS2 rule. They are described in [docs/external.md](docs/external.md). Fixed-scale quantization (FSQ) is the discretizer from HeartLLM [6], reduced to one MLII lead and a reconstruction loss. It does not pretrain Qwen to forecast ECG codes. Patch reprogramming follows TIME-LLM [7]: 13 patches cross-attend to 64 frozen rows of Qwen's input embedding. It does not forecast the trace. The scores are in [results/external_qwen.json](results/external_qwen.json).
+
+| Task | Split | Named | Opaque | FSQ | Reprogram |
+|---|---|---:|---:|---:|---:|
+| Ventricular vs rest | DS1-val | 0.986 | 0.946 | 0.970 | 0.970 |
+| Ventricular vs rest | DS2 | 0.969 | 0.929 | 0.942 | 0.925 |
+| AAMI-5 | DS1-val | 0.784 | 0.827 | 0.854 | 0.882 |
+| AAMI-5 | DS2 | 0.771 | 0.685 | 0.704 | 0.707 |
+| Beat symbols | DS1-val | 0.834 | 0.845 | 0.881 | 0.905 |
+| Beat symbols | DS2 | 0.679 | 0.611 | 0.631 | 0.662 |
+| Rhythm | DS1-val | 0.719 | 0.826 | 0.792 | 0.833 |
+| Rhythm | DS2 | 0.712 | 0.614 | 0.672 | 0.707 |
+
+The cells are AUC. On DS2, named tokens remain the highest of the four inputs on every task. On the DS1 slice that selects the epoch, reprogramming is highest for AAMI-5, symbols, and rhythm, and FSQ is next on AAMI-5 and symbols. Named tokens remain highest on that slice only for ventricular versus rest. The AAMI-5 reprogramming arm selected epoch 1. Every other new arm selected epoch 2.
+
 ## Reproduce
 
 The database and the weights are downloaded. They are not in git.
@@ -58,7 +75,10 @@ uv run python scripts/download_mitbih.py data/mitdb
 uv run python scripts/download_qwen.py
 uv run python scripts/build_beats.py data/mitdb cache/beats.parquet
 uv run python scripts/train_qwen.py cache/beats.parquet
+uv run python scripts/train_external.py data/mitdb models/Qwen2.5-1.5B
 ```
+
+`train_external.py` reads the recordings directly and writes `results/external_qwen.json`. It needs the same GPU recipe.
 
 `train_qwen.py` reads `models/Qwen2.5-1.5B`. The reported recipe needs a CUDA GPU. Batch 64 uses about 5 GB. The script writes `runs/qwen_mitbih.json` and `runs/train.log`.
 
@@ -73,3 +93,7 @@ uv run python scripts/train_qwen.py cache/beats.parquet
 [4] Qwen Team, "Qwen2.5 technical report," arXiv:2412.15115, 2024.
 
 [5] E. J. Hu *et al.*, "LoRA: Low-rank adaptation of large language models," in *Proc. Int. Conf. Learn. Represent.*, 2022.
+
+[6] J. Yang *et al.*, "HeartLLM: Discretized ECG tokenization for LLM-based diagnostic reasoning," arXiv:2508.15338, 2025.
+
+[7] M. Jin *et al.*, "Time-LLM: Time series forecasting by reprogramming large language models," in *Proc. Int. Conf. Learn. Represent.*, 2024.
