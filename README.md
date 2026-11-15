@@ -1,5 +1,7 @@
 # ecgtok
 
+A human-readable taxonomy that turns one ECG beat into tokens for a language model.
+
 Named tokens for one MIT-BIH beat, set against three other inputs on the same window: opaque energy codes, fixed-scale codes, and input alignment into Qwen. All four are classified by the same Qwen2.5-1.5B LoRA. The named tokens are measurements a reading already uses. The other three do not name a measurement.
 
 The tokens are defined in [docs/taxonomy.md](docs/taxonomy.md). Fixed-scale codes and input alignment, the two adapted inputs, are specified in [docs/adapted.md](docs/adapted.md). This page states the protocol, the scores, and how to rerun them.
@@ -65,9 +67,9 @@ Rhythm DS2, named against opaque: AFIB 0.794 / 0.660, AFL 0.754 / 0.509, VT 0.89
 
 ## Embedding size and forward cost
 
-A named beat is 13 tokens drawn from 49 symbols. An opaque beat is 12 tokens drawn from 612 symbols, twelve segments times the 51 tenths from 0 through 50. A fixed-scale beat is 13 tokens drawn from 625 codes, the integers `0` through `624`. Input alignment is 13 vectors of width 1536, not a token string. The first three then enter Qwen as token ids [4]. Alignment enters it as `inputs_embeds`.
+The token lists and the block diagram are in [docs/taxonomy.md](docs/taxonomy.md). A named beat is 13 tokens drawn from 49 symbols. An opaque beat is 12 tokens drawn from 612 symbols, twelve segments times the 51 tenths from 0 through 50. A fixed-scale beat is 13 tokens drawn from 625 codes, the integers `0` through `624`. Input alignment is 13 vectors of width 1536, not a token string. The first three enter Qwen as token ids [4]. Alignment enters it as `inputs_embeds`.
 
-The learned embedding table has one float32 row of length 1536 for each symbol that occurs in DS1 training, plus `<ECG_UNK>`. In the reported named and opaque tables that is 34 named symbols, so 35 rows, and 363 opaque codes, so 364 rows. Fifteen named symbols never occur in this MIT-BIH table and receive no row. Every reported duration token is `<QRS_VERY_NARROW>`. Twenty-four opaque codes appear only outside DS1 training and are mapped to `<ECG_UNK>` at evaluation. Fixed-scale codes follow the same rule. The saved scores do not record how many of the 625 codes occur in DS1 training, so the fixed-scale line below is the full code space. Alignment trains no token table. It copies 64 frozen rows into a buffer.
+The learned embedding table has one float32 row of length 1536 for each symbol that occurs in DS1 training, plus `<ECG_UNK>`. In the reported named and opaque tables that is 34 named symbols, so 35 rows, and 363 opaque codes, so 364 rows. Fifteen named symbols never occur in this MIT-BIH table and receive no row: `<QRS_NARROW>`, `<QRS_MEDIUM>`, `<QRS_WIDE>`, `<QRS_VERY_WIDE>`, `<QRS_NOTCHED>`, `<RETROGRADE_P_PRESENT>`, `<ST_ELEVATED>`, `<ST_DEPRESSED>`, `<ST_QRS_CONCORDANT>`, `<ST_QRS_DISCORDANT>`, `<T_POSITIVE>`, `<T_NEGATIVE>`, `<T_FLAT>`, `<T_QRS_CONCORDANT>`, and `<T_QRS_DISCORDANT>`. Every reported duration token is `<QRS_VERY_NARROW>`. Twenty-four opaque codes appear only outside DS1 training and are mapped to `<ECG_UNK>` at evaluation. Fixed-scale codes follow the same rule. The saved scores do not record how many of the 625 codes occur in DS1 training, so the fixed-scale line below is the full code space. Alignment trains no token table. It copies 64 frozen rows into a buffer.
 
 | Table | Rows | Bytes |
 |---|---:|---:|
