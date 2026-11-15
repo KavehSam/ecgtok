@@ -19,7 +19,19 @@ def named_beat_tokens(
     rr_next_ms: float | None,
     rr_baseline_ms: float | None,
 ) -> tuple[str, ...]:
-    """Uppercase clauses wrapped as single tokens, for example ``<QRS_WIDE>``."""
+    """Build the 13 clinical tokens for one beat window.
+
+    Args:
+        window: Filtered samples centered on the annotated R peak.
+        fs: Sample rate in hertz.
+        r_idx: Index of the R peak inside ``window``.
+        rr_prev_ms: Previous R–R interval in milliseconds.
+        rr_next_ms: Next R–R interval in milliseconds.
+        rr_baseline_ms: Baseline R–R for the record.
+
+    Returns:
+        Uppercase tokens such as ``<QRS_WIDE>``, one per clause.
+    """
     feat = beat_features(np.asarray(window, dtype=np.float64), fs=fs, r_idx=r_idx)
     clauses = named_clauses(
         feat,
@@ -32,7 +44,15 @@ def named_beat_tokens(
 
 
 def opaque_beat_tokens(window: np.ndarray, n_segments: int = N_SEGMENTS) -> tuple[str, ...]:
-    """RMS of equal slices, in tenths of a millivolt. No measurement names."""
+    """Build energy-only tokens with no clinical names.
+
+    Args:
+        window: Beat samples in millivolts.
+        n_segments: Number of equal-length slices along the window.
+
+    Returns:
+        Tokens ``<B{segment}_{tenths}>`` from RMS energy per slice.
+    """
     samples = np.asarray(window, dtype=np.float64).ravel()
     if samples.size == 0 or n_segments < 1:
         return ()

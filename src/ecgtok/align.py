@@ -20,6 +20,16 @@ class PatchAlign(nn.Module):
     """Map a beat window to one vector per patch, in the language-model width."""
 
     def __init__(self, hidden: int, heads: int = 4, prototypes: int = PROTOTYPES) -> None:
+        """Build projection and cross-attention over fixed prototypes.
+
+        Args:
+            hidden: Language-model hidden size.
+            heads: Number of attention heads.
+            prototypes: Count of frozen prototype rows in ``self.prototypes``.
+
+        Raises:
+            ValueError: When ``hidden`` is not divisible by ``heads``.
+        """
         super().__init__()
         if hidden % heads != 0:
             raise ValueError("hidden must be divisible by the number of heads")
@@ -30,7 +40,17 @@ class PatchAlign(nn.Module):
         self.register_buffer("prototypes", torch.zeros(prototypes, hidden))
 
     def forward(self, windows: torch.Tensor) -> torch.Tensor:
-        """Return ``(batch, 13, hidden)`` for a window that covers the 13 patches."""
+        """Cross-attend 13 patches against the prototype bank.
+
+        Args:
+            windows: Batch of beat windows of shape ``(batch, window_len)``.
+
+        Returns:
+            Embeddings of shape ``(batch, 13, hidden)``.
+
+        Raises:
+            ValueError: When ``windows`` is shorter than ``13 * PATCH`` samples.
+        """
         needed = self.frames * self.patch
         if windows.shape[-1] < needed:
             raise ValueError("window is shorter than the patch grid")

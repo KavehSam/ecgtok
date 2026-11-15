@@ -4,7 +4,14 @@ from __future__ import annotations
 
 
 def qrs_duration_clause(qrs_ms: float) -> str:
-    """QRS duration at 80, 100, 120, and 160 ms."""
+    """Map QRS duration to a width clause.
+
+    Args:
+        qrs_ms: QRS duration in milliseconds.
+
+    Returns:
+        A ``qrs_*`` clause name for the duration bin.
+    """
     if qrs_ms < 80:
         return "qrs_very_narrow"
     if qrs_ms < 100:
@@ -17,7 +24,14 @@ def qrs_duration_clause(qrs_ms: float) -> str:
 
 
 def r_amplitude_clause(r_amp: float) -> str:
-    """Absolute R-wave amplitude at 0.15, 0.50, 0.80, and 1.50 mV."""
+    """Map R-wave amplitude to a size clause.
+
+    Args:
+        r_amp: R peak amplitude in millivolts (sign preserved before taking magnitude).
+
+    Returns:
+        An ``r_*`` clause name for the amplitude bin.
+    """
     magnitude = abs(r_amp)
     if magnitude < 0.15:
         return "r_very_low"
@@ -31,7 +45,14 @@ def r_amplitude_clause(r_amp: float) -> str:
 
 
 def pr_clause(pr_ms: float | None) -> str:
-    """PR interval at 100, 120, 200, and 240 ms. Unmeasurable when no P onset was found."""
+    """Map PR interval to a timing clause.
+
+    Args:
+        pr_ms: PR interval in milliseconds, or ``None`` when P onset is unknown.
+
+    Returns:
+        A ``pr_*`` clause name, or ``pr_unmeasurable`` when ``pr_ms`` is ``None``.
+    """
     if pr_ms is None:
         return "pr_unmeasurable"
     if pr_ms < 100:
@@ -46,7 +67,15 @@ def pr_clause(pr_ms: float | None) -> str:
 
 
 def timing_clause(rr_prev_ms: float | None, rr_baseline_ms: float | None) -> str:
-    """Previous R–R divided by the baseline interval."""
+    """Compare the previous R–R interval to the record baseline.
+
+    Args:
+        rr_prev_ms: Previous R–R interval in milliseconds.
+        rr_baseline_ms: Median of earlier R–R intervals on the same record.
+
+    Returns:
+        A ``beat_*`` prematurity clause, or ``timing_uncertain`` when inputs are missing.
+    """
     if rr_prev_ms is None or rr_baseline_ms is None or rr_baseline_ms <= 0:
         return "timing_uncertain"
     ratio = rr_prev_ms / rr_baseline_ms
@@ -66,7 +95,16 @@ def pause_clause(
     rr_next_ms: float | None,
     rr_baseline_ms: float | None,
 ) -> str:
-    """Sum of the previous and next R–R intervals against the same baseline."""
+    """Classify the pause pattern around the beat.
+
+    Args:
+        rr_prev_ms: Previous R–R interval in milliseconds.
+        rr_next_ms: Next R–R interval in milliseconds.
+        rr_baseline_ms: Median of earlier R–R intervals on the same record.
+
+    Returns:
+        A pause clause such as ``interpolated_beat`` or ``pause_uncertain``.
+    """
     if rr_prev_ms is None or rr_next_ms is None or rr_baseline_ms is None or rr_baseline_ms <= 0:
         return "pause_uncertain"
     span = rr_prev_ms + rr_next_ms

@@ -19,7 +19,21 @@ from ecgtok.delineate import delineate_beat, ms_to_samples
 
 @dataclass
 class BeatMeasures:
-    """Durations and amplitudes taken from the fiducials, in milliseconds and millivolts."""
+    """Scalar measurements derived from beat fiducials.
+
+    Attributes:
+        qrs_ms: QRS duration in milliseconds.
+        r_amp: R peak amplitude in millivolts.
+        p_amp: P peak amplitude, or ``None`` when P is absent.
+        t_amp: T peak amplitude, or ``None`` when T is uncertain.
+        st_amp: ST level at J+80 ms in millivolts.
+        qrs_pos: Maximum positive QRS deflection.
+        qrs_neg: Maximum negative QRS deflection as a positive magnitude.
+        qrs_seg: Baseline-subtracted QRS segment.
+        pr_ms: PR interval in milliseconds, or ``None``.
+        retrograde: Whether a retrograde P was detected.
+    """
+
     qrs_ms: float
     r_amp: float
     p_amp: float | None
@@ -33,7 +47,16 @@ class BeatMeasures:
 
 
 def beat_features(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) -> BeatMeasures:
-    """Measure one window. ``r_idx`` is the R peak inside that window."""
+    """Measure durations and amplitudes on one beat window.
+
+    Args:
+        sig: Beat window samples in millivolts.
+        fs: Sample rate in hertz.
+        r_idx: R peak index inside ``sig``.
+
+    Returns:
+        A ``BeatMeasures`` instance for clause generation.
+    """
     x = np.asarray(sig, dtype=np.float64).ravel()
     fid = delineate_beat(x, fs=fs, r_idx=r_idx)
     qrs_seg = x[fid.qrs_on : fid.qrs_off + 1] - fid.baseline
@@ -59,6 +82,15 @@ def beat_features(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) -
 
 
 def _polarity(qrs_pos: float, qrs_neg: float) -> str:
+    """Classify QRS polarity dominance.
+
+    Args:
+        qrs_pos: Maximum positive QRS deflection.
+        qrs_neg: Maximum negative QRS deflection magnitude.
+
+    Returns:
+        A ``qrs_*_dominant`` or ``qrs_biphasic`` clause name.
+    """
     if qrs_neg > qrs_pos * 1.2 and qrs_neg > 0.1:
         return "qrs_negative_dominant"
     if qrs_pos > qrs_neg * 1.2:
@@ -67,12 +99,31 @@ def _polarity(qrs_pos: float, qrs_neg: float) -> str:
 
 
 def _larger_polarity(qrs_pos: float, qrs_neg: float) -> int:
+    """Return the sign of the larger QRS lobe.
+
+    Args:
+        qrs_pos: Maximum positive QRS deflection.
+        qrs_neg: Maximum negative QRS deflection magnitude.
+
+    Returns:
+        ``1`` for positive dominance, ``-1`` for negative, ``0`` when tied.
+    """
     if np.isclose(qrs_pos, qrs_neg):
         return 0
     return 1 if qrs_pos > qrs_neg else -1
 
 
 def _side_notched(segment: np.ndarray, sign: int, fs: int) -> bool:
+    """Detect side notches separated by at least 20 ms.
+
+    Args:
+        segment: QRS segment to inspect.
+        sign: ``1`` for positive search, ``-1`` for inverted search.
+        fs: Sample rate in hertz.
+
+    Returns:
+        ``True`` when two peaks are at least 20 ms apart.
+    """
     wave = segment if sign > 0 else -segment
     peak = float(np.max(wave)) if len(wave) else 0.0
     if peak <= 0:
@@ -86,6 +137,17 @@ def _side_notched(segment: np.ndarray, sign: int, fs: int) -> bool:
 
 
 def _notch_clause(segment: np.ndarray, qrs_pos: float, qrs_neg: float, fs: int) -> str:
+    """Emit notched or smooth QRS shape clause.
+
+    Args:
+        segment: Baseline-subtracted QRS samples.
+        qrs_pos: Maximum positive QRS deflection.
+        qrs_neg: Maximum negative QRS deflection magnitude.
+        fs: Sample rate in hertz.
+
+    Returns:
+        ``qrs_notched`` or ``qrs_smooth``.
+    """
     if np.isclose(qrs_pos, qrs_neg):
         notched = _side_notched(segment, 1, fs) or _side_notched(segment, -1, fs)
     else:
@@ -94,6 +156,17 @@ def _notch_clause(segment: np.ndarray, qrs_pos: float, qrs_neg: float, fs: int) 
 
 
 def _agreement(level: float, qrs_pos: float, qrs_neg: float, uncertain: str) -> str:
+    """Compare wave polarity with QRS polarity.
+
+    Args:
+        level: ST or T amplitude in millivolts.
+        qrs_pos: Maximum positive QRS deflection.
+        qrs_neg: Maximum negative QRS deflection magnitude.
+        uncertain: Clause to return when polarity is ambiguous.
+
+    Returns:
+        A concordant, discordant, or uncertain relation clause.
+    """
     if abs(level) <= 0.05 or _larger_polarity(qrs_pos, qrs_neg) == 0:
         return uncertain
     same = (level > 0 and qrs_pos > qrs_neg) or (level < 0 and qrs_neg > qrs_pos)
@@ -109,7 +182,18 @@ def named_clauses(
     rr_next_ms: float | None,
     rr_baseline_ms: float | None,
 ) -> list[str]:
-    """One clause name per measurement, in the order the token string uses."""
+    """Build the ordered list of lowercase clause names for one beat.
+
+    Args:
+        feat: Measurements from ``beat_features``.
+        fs: Sample rate in hertz.
+        rr_prev_ms: Previous R–R interval in milliseconds.
+        rr_next_ms: Next R–R interval in milliseconds.
+        rr_baseline_ms: Baseline R–R for the record.
+
+    Returns:
+        Thirteen clause strings in token order.
+    """
     if feat.p_amp is None:
         p_clause = "p_absent"
     elif feat.p_amp >= 0:

@@ -15,14 +15,26 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _list_leads(data_dir: Path, record_name: str) -> None:
-    """Print ``index<TAB>lead_name`` rows for one record header."""
+    """Print WFDB lead indices for one record.
+
+    Args:
+        data_dir: MIT-BIH root directory.
+        record_name: Record id such as ``"208"``.
+
+    Returns:
+        None. Writes ``index<TAB>name`` lines to stdout.
+    """
     record = wfdb.rdrecord(str(data_dir / record_name))
     for index, name in enumerate(lead_names(record)):
         print(f"{index}\t{name}")
 
 
 def _parse_args() -> argparse.Namespace:
-    """Build the command-line argument parser."""
+    """Parse visualization CLI flags.
+
+    Returns:
+        Parsed ``argparse`` namespace.
+    """
     parser = argparse.ArgumentParser(
         description="Visualize one MIT-BIH beat and the ECGTok named token string.",
     )
@@ -57,13 +69,26 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _default_out_path(record: str, timestamp_ms: int, lead_name: str) -> Path:
-    """Default PNG path under ``docs/figures`` when ``--out`` is omitted."""
+    """Build the default figure path.
+
+    Args:
+        record: MIT-BIH record id.
+        timestamp_ms: Beat time in milliseconds.
+        lead_name: Resolved WFDB lead name.
+
+    Returns:
+        Path under ``docs/figures``.
+    """
     safe_lead = lead_name.replace(" ", "_")
     return REPO / "docs" / "figures" / f"{record}_{timestamp_ms}_{safe_lead}.png"
 
 
 def main() -> int:
-    """CLI entry point. Returns a process exit code."""
+    """Load one beat and write a figure.
+
+    Returns:
+        ``0`` on success, ``1`` on user or data errors.
+    """
     args = _parse_args()
     data_dir = args.data_dir
     if not data_dir.is_dir():

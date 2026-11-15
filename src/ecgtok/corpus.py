@@ -22,6 +22,15 @@ from ecgtok.windows import (
 
 
 def _lead_index(record: object, lead: str = "MLII") -> int | None:
+    """Find the WFDB channel index for a lead name.
+
+    Args:
+        record: WFDB record object with ``sig_name``.
+        lead: Lead name to match, case-insensitive.
+
+    Returns:
+        Channel index, or ``None`` when the lead is absent.
+    """
     names = getattr(record, "sig_name", None) or []
     for index, name in enumerate(names):
         if str(name).strip().upper() == lead:
@@ -30,7 +39,17 @@ def _lead_index(record: object, lead: str = "MLII") -> int | None:
 
 
 def load_beats(data_dir: Path) -> tuple[pd.DataFrame, np.ndarray]:
-    """Return the beat table and a float32 window for every row, in the same order."""
+    """Load every AAMI-mapped MLII beat and its aligned window.
+
+    Args:
+        data_dir: Directory containing MIT-BIH ``.hea`` headers.
+
+    Returns:
+        A beat table and a ``float32`` window array with one row per beat.
+
+    Raises:
+        FileNotFoundError: When no MLII beats are found under ``data_dir``.
+    """
     highpass, lowpass = design_bandpass(FS)
     rows: list[dict[str, object]] = []
     windows: list[np.ndarray] = []

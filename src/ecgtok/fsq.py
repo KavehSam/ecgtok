@@ -18,10 +18,17 @@ VOCAB = LEVELS**LATENT
 
 
 def fsq_ids(latent: torch.Tensor, levels: int = LEVELS) -> tuple[torch.Tensor, torch.Tensor]:
-    """Straight-through codes and the base-``levels`` token id of each vector.
+    """Quantize latent vectors with straight-through rounding.
 
-    ``latent`` ends in the code dimension. Ids use the last axis as the digits,
-    lowest dimension first.
+    Args:
+        latent: Tensor whose last dimension is the code dimension.
+        levels: Number of discrete levels per dimension.
+
+    Returns:
+        ``(ste_codes, token_ids)`` where ids use mixed-radix packing.
+
+    Raises:
+        ValueError: When ``levels`` is less than 2.
     """
     if levels < 2:
         raise ValueError("levels must be at least 2")
@@ -37,6 +44,7 @@ class BeatQuantizer(nn.Module):
     """Encode one beat as 13 quantized codes and reconstruct the window."""
 
     def __init__(self) -> None:
+        """Initialize the 1-D convolutional encoder and decoder."""
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Conv1d(1, 32, kernel_size=9, stride=5, padding=4),
@@ -54,7 +62,14 @@ class BeatQuantizer(nn.Module):
         )
 
     def forward(self, windows: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Return the reconstructed window and integer codes of shape ``(batch, 13)``."""
+        """Reconstruct the input and emit integer FSQ codes.
+
+        Args:
+            windows: Batch of shape ``(batch, window_len)`` in millivolts.
+
+        Returns:
+            ``(reconstruction, ids)`` with ids shaped ``(batch, 13)``.
+        """
         hidden = self.encoder(windows.unsqueeze(1)).transpose(1, 2)
         ste, ids = fsq_ids(self.to_latent(hidden), LEVELS)
         decoded = self.decoder(self.from_latent(ste).transpose(1, 2))
@@ -63,7 +78,14 @@ class BeatQuantizer(nn.Module):
 
 
 def codes_to_text(ids: torch.Tensor) -> list[str]:
-    """Join each beat's codes as ``<FSQ_n>`` tokens."""
+    """Format quantized codes as tokenizer-ready strings.
+
+    Args:
+        ids: Integer codes of shape ``(batch, 13)``.
+
+    Returns:
+        One space-joined string per row, using ``<FSQ_n>`` tokens.
+    """
     rows: list[str] = []
     for beat in ids.detach().cpu().tolist():
         rows.append(" ".join(f"<FSQ_{int(code)}>" for code in beat))

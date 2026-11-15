@@ -7,7 +7,16 @@ from sklearn.metrics import f1_score, roc_auc_score
 
 
 def class_weights(labels: np.ndarray, n_classes: int, max_weight: float = 10.0) -> np.ndarray:
-    """Inverse-frequency weights. Absent classes stay at zero, and none exceed ``max_weight``."""
+    """Compute inverse-frequency class weights for multiclass training.
+
+    Args:
+        labels: Integer class labels.
+        n_classes: Number of classes, including empty bins.
+        max_weight: Cap applied to every non-zero weight.
+
+    Returns:
+        A weight vector of length ``n_classes``; absent classes are zero.
+    """
     counts = np.bincount(np.asarray(labels, dtype=int), minlength=n_classes).astype(np.float64)
     present = counts > 0
     weights = np.zeros(n_classes, dtype=np.float64)
@@ -17,7 +26,15 @@ def class_weights(labels: np.ndarray, n_classes: int, max_weight: float = 10.0) 
 
 
 def binary_counts(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
-    """Counts, sensitivity, precision, and F1 at one hard threshold."""
+    """Summarize a binary decision at one threshold.
+
+    Args:
+        y_true: Ground-truth labels in ``{0, 1}``.
+        y_pred: Hard predictions in ``{0, 1}``.
+
+    Returns:
+        Counts, sensitivity, precision, and F1 in one dictionary.
+    """
     truth = np.asarray(y_true, dtype=int)
     pred = np.asarray(y_pred, dtype=int)
     tp = int(np.sum((truth == 1) & (pred == 1)))
@@ -26,6 +43,15 @@ def binary_counts(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     fn = int(np.sum((truth == 1) & (pred == 0)))
 
     def rate(num: int, den: int) -> float:
+        """Compute a rate with zero denominator guard.
+
+        Args:
+            num: Numerator count.
+            den: Denominator count.
+
+        Returns:
+            ``num / den``, or ``0.0`` when ``den`` is zero.
+        """
         return 0.0 if den == 0 else float(num / den)
 
     sensitivity = rate(tp, tp + fn)
@@ -43,7 +69,15 @@ def binary_counts(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 
 
 def choose_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
-    """Threshold from 0.05 to 0.95, in steps of 0.05, that maximizes F1."""
+    """Pick the probability threshold that maximizes ventricular F1 on validation.
+
+    Args:
+        y_true: Ground-truth labels in ``{0, 1}``.
+        scores: Predicted positive-class probabilities.
+
+    Returns:
+        Threshold between 0.05 and 0.95 in steps of 0.05.
+    """
     best_t = 0.5
     best_f1 = -1.0
     for step in range(5, 100, 5):
@@ -56,7 +90,16 @@ def choose_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
 
 
 def multiclass_scores(truth: np.ndarray, probs: np.ndarray, names: list[str]) -> dict[str, object]:
-    """Macro AUC and macro F1 over classes that have both positives and negatives."""
+    """Report macro AUC and macro F1 over scorable classes.
+
+    Args:
+        truth: Integer class labels.
+        probs: Class probability matrix of shape ``(n, len(names))``.
+        names: Human-readable name per class column.
+
+    Returns:
+        Macro scores, per-class AUC/F1 maps, and the list of classes that were scored.
+    """
     target = np.asarray(truth, dtype=int)
     predicted = np.argmax(probs, axis=1)
     per_auc: dict[str, float | None] = {}
