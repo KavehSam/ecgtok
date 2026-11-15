@@ -1,5 +1,7 @@
 # ecgtok
 
+A human-readable taxonomy that turns one ECG beat into tokens for a language model.
+
 Named tokens for one MIT-BIH beat, compared with opaque energy codes of the same window. Both strings are classified by Qwen2.5-1.5B with the same LoRA setup. The question is whether names a reader already uses beat a code that only records how much energy sat in each slice of the beat.
 
 The tokens are defined in [docs/taxonomy.md](docs/taxonomy.md). This page states the protocol, the scores, and how to rerun them.
