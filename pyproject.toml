@@ -23,7 +23,7 @@ train = [
     "huggingface-hub>=0.26",
     "tqdm>=4.66",
 ]
-dev = ["pytest>=8.0", "ruff>=0.6"]
+dev = ["pytest>=8.0", "ruff>=0.6", "matplotlib>=3.8"]
 
 [build-system]
 requires = ["hatchling"]
