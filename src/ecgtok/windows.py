@@ -25,6 +25,10 @@ def slice_window(
     pre_samples: int = PRE_SAMPLES,
     post_samples: int = POST_SAMPLES,
 ) -> np.ndarray | None:
+    """Samples from ``pre_samples`` before ``center`` through ``post_samples`` after it.
+
+    Returns ``None`` when that span would leave the record.
+    """
     start = int(center) - pre_samples
     end = int(center) + post_samples + 1
     values = np.asarray(sig)
@@ -34,17 +38,20 @@ def slice_window(
 
 
 def design_bandpass(fs: int = FS) -> tuple[np.ndarray, np.ndarray]:
+    """FIR highpass at 0.6 Hz and lowpass at 40 Hz."""
     highpass = firwin(181, 0.6, pass_zero=False, fs=fs, window="hamming")
     lowpass = firwin(73, 40.0, pass_zero=True, fs=fs, window="hamming")
     return highpass, lowpass
 
 
 def apply_bandpass(sig: np.ndarray, highpass: np.ndarray, lowpass: np.ndarray) -> np.ndarray:
+    """Highpass, then lowpass. The caller shifts by the filter delay when slicing."""
     filtered = lfilter(lowpass, 1.0, lfilter(highpass, 1.0, np.asarray(sig, dtype=np.float64)))
     return np.asarray(filtered, dtype=np.float64)
 
 
 def symbol_to_aami(symbol: str) -> int | None:
+    """AAMI class index for a MIT-BIH beat symbol. ``None`` when it is not a QRS class."""
     token = symbol.strip()
     groups = ((AAMI_N, 0), (AAMI_S, 1), (AAMI_V, 2), (AAMI_F, 3), (AAMI_Q, 4))
     for symbols, label in groups:
@@ -54,6 +61,7 @@ def symbol_to_aami(symbol: str) -> int | None:
 
 
 def rhythm_intervals(record_names: list[str], samples: list[int | None]) -> pd.DataFrame:
+    """Previous R–R, next R–R, and the median of up to ten earlier intervals, in milliseconds."""
     previous = [np.nan] * len(record_names)
     following = [np.nan] * len(record_names)
     baseline = [np.nan] * len(record_names)

@@ -7,6 +7,7 @@ from sklearn.metrics import f1_score, roc_auc_score
 
 
 def class_weights(labels: np.ndarray, n_classes: int, max_weight: float = 10.0) -> np.ndarray:
+    """Inverse-frequency weights. Absent classes stay at zero, and none exceed ``max_weight``."""
     counts = np.bincount(np.asarray(labels, dtype=int), minlength=n_classes).astype(np.float64)
     present = counts > 0
     weights = np.zeros(n_classes, dtype=np.float64)
@@ -16,6 +17,7 @@ def class_weights(labels: np.ndarray, n_classes: int, max_weight: float = 10.0) 
 
 
 def binary_counts(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
+    """Counts, sensitivity, precision, and F1 at one hard threshold."""
     truth = np.asarray(y_true, dtype=int)
     pred = np.asarray(y_pred, dtype=int)
     tp = int(np.sum((truth == 1) & (pred == 1)))
@@ -41,6 +43,7 @@ def binary_counts(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
 
 
 def choose_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
+    """Threshold from 0.05 to 0.95, in steps of 0.05, that maximizes F1."""
     best_t = 0.5
     best_f1 = -1.0
     for step in range(5, 100, 5):
@@ -53,6 +56,7 @@ def choose_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
 
 
 def multiclass_scores(truth: np.ndarray, probs: np.ndarray, names: list[str]) -> dict[str, object]:
+    """Macro AUC and macro F1 over classes that have both positives and negatives."""
     target = np.asarray(truth, dtype=int)
     predicted = np.argmax(probs, axis=1)
     per_auc: dict[str, float | None] = {}

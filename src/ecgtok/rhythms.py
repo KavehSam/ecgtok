@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 def clean_aux(note: object) -> str:
+    """Annotation note as text, with trailing nulls removed."""
     if note is None:
         return ""
     text = note.decode("ascii", errors="ignore") if isinstance(note, bytes) else str(note)
@@ -11,6 +12,7 @@ def clean_aux(note: object) -> str:
 
 
 def rhythm_changes(samples: list[int], aux_notes: list[object]) -> list[tuple[int, str]]:
+    """Rhythm labels from aux notes that start with ``(``."""
     changes: list[tuple[int, str]] = []
     for sample, note in zip(samples, aux_notes, strict=True):
         text = clean_aux(note)
@@ -21,6 +23,7 @@ def rhythm_changes(samples: list[int], aux_notes: list[object]) -> list[tuple[in
 
 
 def rhythm_at(changes: list[tuple[int, str]], sample: int, default: str = "N") -> str:
+    """Rhythm in force at this sample. A note applies at its sample and after it."""
     current = default
     for position, name in changes:
         if position <= sample:

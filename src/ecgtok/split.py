@@ -22,10 +22,12 @@ DS2_RECORDS = frozenset(
 
 
 def record_key(value: object) -> str:
+    """Record name with surrounding whitespace removed."""
     return str(value).strip()
 
 
 def de_chazal_group(value: object) -> str | None:
+    """``DS1``, ``DS2``, or ``None`` for a paced record or a name outside the split."""
     key = record_key(value)
     if key in DS1_RECORDS:
         return "DS1"

@@ -19,6 +19,7 @@ from ecgtok.delineate import delineate_beat, ms_to_samples
 
 @dataclass
 class BeatMeasures:
+    """Durations and amplitudes taken from the fiducials, in milliseconds and millivolts."""
     qrs_ms: float
     r_amp: float
     p_amp: float | None
@@ -32,6 +33,7 @@ class BeatMeasures:
 
 
 def beat_features(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) -> BeatMeasures:
+    """Measure one window. ``r_idx`` is the R peak inside that window."""
     x = np.asarray(sig, dtype=np.float64).ravel()
     fid = delineate_beat(x, fs=fs, r_idx=r_idx)
     qrs_seg = x[fid.qrs_on : fid.qrs_off + 1] - fid.baseline
@@ -107,6 +109,7 @@ def named_clauses(
     rr_next_ms: float | None,
     rr_baseline_ms: float | None,
 ) -> list[str]:
+    """One clause name per measurement, in the order the token string uses."""
     if feat.p_amp is None:
         p_clause = "p_absent"
     elif feat.p_amp >= 0:
