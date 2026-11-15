@@ -808,6 +808,7 @@ dependencies = [
     { name = "scikit-learn" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "tqdm" },
     { name = "wfdb" },
 ]
 
@@ -835,6 +836,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.4" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "torch", marker = "extra == 'train'", specifier = ">=2.2" },
+    { name = "tqdm", specifier = ">=4.66" },
     { name = "tqdm", marker = "extra == 'train'", specifier = ">=4.66" },
     { name = "transformers", marker = "extra == 'train'", specifier = ">=4.46" },
     { name = "wfdb", specifier = ">=4.1" },
