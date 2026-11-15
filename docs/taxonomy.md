@@ -37,7 +37,7 @@ Every beat emits 13 tokens, one from each row below, in this order. The code can
 | Prematurity | `` `<TIMING_UNCERTAIN>` ``, `` `<BEAT_VERY_EARLY>` `` below 0.70, `` `<BEAT_EARLY>` `` below 0.85, `` `<BEAT_ON_TIME>` `` through 1.15, `` `<BEAT_LATE>` `` through 1.40, otherwise `` `<BEAT_VERY_LATE>` `` |
 | Pause | `` `<PAUSE_UNCERTAIN>` ``, `` `<INTERPOLATED_BEAT>` `` when the surrounding R–R sum is at most 1.25 times the baseline, `` `<FULL_COMPENSATORY_PAUSE>` `` when that sum is 1.8 to 2.2 times the baseline, otherwise `` `<INCOMPLETE_PAUSE>` `` |
 
-The opaque control uses the same window and no clinical names. The window is split into twelve equal segments. Each token is the RMS of one segment, in tenths of a millivolt, clipped at 5.0 mV. Tenths run from 0 through 50, so the code space is 12 × 51 = 612 symbols, written `<B00_0>` through `<B11_50>`. A beat carries 12 of them. The language model, the split, and the labels stay the same. The MIT-BIH scores, and the size of the two embedding tables, are in the README.
+The opaque control uses the same window and no clinical names. The window is split into twelve equal segments. Each token is the RMS of one segment, in tenths of a millivolt, clipped at 5.0 mV. Tenths run from 0 through 50, so the code space is 12 × 51 = 612 symbols, written `<B00_0>` through `<B11_50>`. A beat carries 12 of them. The language model, the split, and the labels stay the same. The MIT-BIH scores, and the size of the embedding tables, are in the README.
 
 ## Where the tokens go
 
@@ -55,7 +55,7 @@ flowchart TD
   pool --> head["linear head"]
 ```
 
-One block, shared by both arms:
+One block, shared by every input:
 
 ```mermaid
 flowchart LR
@@ -74,3 +74,5 @@ flowchart LR
 ```
 
 For a named beat, L is 13. For an opaque beat, L is 12. Padding brings the stored tensor to length 24, and the attention mask ignores those pad positions.
+
+Fixed-scale codes use this same overlay. The learned rows are `<FSQ_n>` instead of the 49 clause symbols, and L is 13. Input alignment does not use the overlay. A cross-attention block writes the 13 vectors that enter the blocks above. Both are specified in [adapted.md](adapted.md). They are not part of the 49-symbol list.
