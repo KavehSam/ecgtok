@@ -814,6 +814,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "matplotlib" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -828,6 +829,7 @@ train = [
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'train'", specifier = ">=0.26" },
+    { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "peft", marker = "extra == 'train'", specifier = ">=0.13" },

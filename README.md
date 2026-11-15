@@ -6,6 +6,24 @@ Named tokens for one MIT-BIH beat, compared with opaque energy codes of the same
 
 The tokens are defined in [docs/taxonomy.md](docs/taxonomy.md). This page states the protocol, the scores, and how to rerun them.
 
+## From waveform to tokens
+
+Each annotated beat is cut to **300 ms before R** and **600 ms after R** on the lead you choose. Measurements on that window become **13 named tokens** (for example `<QRS_WIDE>`, `<T_NEGATIVE>`).
+
+![Ventricular beat on MIT-BIH 208 with named tokens](docs/figures/example_208_6222_MLII.png)
+
+Pick any beat after you have the database under `data/mitdb`:
+
+```powershell
+uv sync --extra dev
+uv run python scripts/visualize_beat.py --record 208 --timestamp-ms 6222 --lead MLII `
+  --out docs/figures/my_beat.png
+# or use the WFDB channel index instead of the lead name:
+uv run python scripts/visualize_beat.py --record 208 --timestamp-ms 6222 --lead-index 0
+# list channels on a record:
+uv run python scripts/visualize_beat.py --record 208 --list-leads
+```
+
 ## Protocol
 
 Beats are the MIT-BIH Arrhythmia Database QRS annotations that map to an AAMI class [1], [3]. The lead is MLII. Paced records 102, 104, 107, and 217 are excluded. The remaining records follow the de Chazal DS1/DS2 division [2].
