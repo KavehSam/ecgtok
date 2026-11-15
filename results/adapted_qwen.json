@@ -2,7 +2,7 @@
   "epochs": 2,
   "quantizer_epochs": 5,
   "frames": 13,
-  "note": "FSQ is a one-lead fixed-scale quantizer trained to reconstruct DS1 beats, then classified like the named tokens. Reprogramming cross-attends 13 patches to 64 frozen Qwen embedding rows. Neither arm is a full reproduction of HeartLLM or TIME-LLM.",
+  "note": "FSQ is a one-lead fixed-scale quantizer trained to reconstruct DS1 beats, then classified like the named tokens. Input alignment cross-attends 13 patches to 64 frozen Qwen embedding rows. Neither arm is a full reproduction of HeartLLM or TIME-LLM.",
   "tasks": {
     "ventricular": {
       "arms": {
@@ -35,7 +35,7 @@
             "f1": 0.6091939703500684
           }
         },
-        "reprogram": {
+        "align": {
           "epoch": 2,
           "classes": [
             "rest",
@@ -127,7 +127,7 @@
             }
           }
         },
-        "reprogram": {
+        "align": {
           "epoch": 1,
           "classes": [
             "F",
@@ -294,7 +294,7 @@
             }
           }
         },
-        "reprogram": {
+        "align": {
           "epoch": 2,
           "classes": [
             "A",
@@ -494,7 +494,7 @@
             }
           }
         },
-        "reprogram": {
+        "align": {
           "epoch": 2,
           "classes": [
             "AFIB",

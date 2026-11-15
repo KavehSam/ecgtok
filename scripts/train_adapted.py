@@ -1,4 +1,4 @@
-"""FSQ codes and patch reprogramming on the four MIT-BIH tasks.
+"""Fixed-scale codes and input alignment on the four MIT-BIH tasks.
 
 DS1 trains. The last 15% of each DS1 record selects the epoch and, for
 ventricular versus rest, the threshold. DS2 is scored once from that
@@ -19,10 +19,10 @@ from sklearn.metrics import roc_auc_score
 from torch.utils.data import DataLoader, Dataset
 
 import train_qwen
+from ecgtok.align import PROTOTYPES, PatchAlign
 from ecgtok.corpus import load_beats
 from ecgtok.fsq import FRAMES, BeatQuantizer, codes_to_text
 from ecgtok.metrics import binary_counts, choose_threshold, class_weights, multiclass_scores
-from ecgtok.reprogram import PROTOTYPES, PatchReprogram
 from ecgtok.split import split_ds1_ds2
 
 RECON_EPOCHS = 5
@@ -99,24 +99,24 @@ def _prototypes(base: nn.Module, count: int, device: str) -> torch.Tensor:
     return chosen
 
 
-def _reprogram_logits(
+def _align_logits(
     base: nn.Module,
     head: nn.Module,
-    reprogram: PatchReprogram,
+    align: PatchAlign,
     windows: torch.Tensor,
     device: str,
 ) -> torch.Tensor:
-    embeds = reprogram(windows.to(device))
+    embeds = align(windows.to(device))
     dtype = base.get_input_embeddings().weight.dtype
     mask = torch.ones(embeds.shape[:2], dtype=torch.long, device=device)
     hidden = base(inputs_embeds=embeds.to(dtype=dtype), attention_mask=mask).last_hidden_state
     return head(hidden[:, -1, :].float())
 
 
-def _score_reprogram(
+def _score_align(
     base: nn.Module,
     head: nn.Module,
-    reprogram: PatchReprogram,
+    align: PatchAlign,
     loader: DataLoader[dict[str, torch.Tensor]],
     frame: pd.DataFrame,
     names: list[str],
@@ -126,13 +126,13 @@ def _score_reprogram(
 ) -> tuple[float, dict[str, object]]:
     base.eval()
     head.eval()
-    reprogram.eval()
+    align.eval()
     rows: list[np.ndarray] = []
     with torch.no_grad():
         for batch in loader:
-            logits = _reprogram_logits(base, head, reprogram, batch["window"], device)
+            logits = _align_logits(base, head, align, batch["window"], device)
             if not torch.isfinite(logits).all():
-                raise RuntimeError("reprogram evaluation logits are not finite")
+                raise RuntimeError("align evaluation logits are not finite")
             if binary:
                 rows.append(torch.sigmoid(logits.squeeze(-1)).cpu().numpy())
             else:
@@ -153,7 +153,7 @@ def _score_reprogram(
     return float(metrics["macro_auc"]), metrics  # type: ignore[arg-type]
 
 
-def _train_reprogram(
+def _train_align(
     frame: pd.DataFrame,
     windows: np.ndarray,
     task: str,
@@ -167,9 +167,9 @@ def _train_reprogram(
     tokenizer, base, head, _extra, _row_of, _unk = train_qwen._build([], n_out, device)
     del tokenizer
     hidden = int(base.config.hidden_size)
-    reprogram = PatchReprogram(hidden).to(device)
+    align = PatchAlign(hidden).to(device)
     with torch.no_grad():
-        reprogram.prototypes.copy_(_prototypes(base, PROTOTYPES, device))
+        align.prototypes.copy_(_prototypes(base, PROTOTYPES, device))
     train_loader = DataLoader(WindowRows(train, windows), batch_size=64, shuffle=True)
     val_loader = DataLoader(WindowRows(validation, windows), batch_size=128)
     test_loader = DataLoader(WindowRows(test, windows), batch_size=128)
@@ -182,7 +182,7 @@ def _train_reprogram(
         counts = class_weights(train["target"].to_numpy(), len(names))
         weights = torch.tensor(counts, dtype=torch.float32, device=device)
         loss_fn = nn.CrossEntropyLoss(weight=weights)
-    pieces = [*base.parameters(), *reprogram.parameters(), *head.parameters()]
+    pieces = [*base.parameters(), *align.parameters(), *head.parameters()]
     trainable = [param for param in pieces if param.requires_grad]
     opt = torch.optim.AdamW(trainable, lr=1e-4)
     best_score = -1.0
@@ -191,31 +191,31 @@ def _train_reprogram(
     for epoch in range(1, train_qwen.EPOCHS + 1):
         base.train()
         head.train()
-        reprogram.train()
+        align.train()
         for step, batch in enumerate(train_loader, start=1):
-            logits = _reprogram_logits(base, head, reprogram, batch["window"], device)
+            logits = _align_logits(base, head, align, batch["window"], device)
             target = batch["labels"].to(device)
             loss = loss_fn(logits.squeeze(-1), target.float()) if binary else loss_fn(logits, target.long())
             if not torch.isfinite(loss):
-                raise RuntimeError(f"{task} reprogram epoch {epoch} step {step} loss is not finite")
+                raise RuntimeError(f"{task} align epoch {epoch} step {step} loss is not finite")
             opt.zero_grad()
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(trainable, 1.0)
             if not torch.isfinite(grad_norm):
-                raise RuntimeError(f"{task} reprogram epoch {epoch} step {step} gradient is not finite")
+                raise RuntimeError(f"{task} align epoch {epoch} step {step} gradient is not finite")
             opt.step()
             if step == 1 or step % 100 == 0 or step == len(train_loader):
                 loss_text = f"{float(loss.detach()):.4f}"
-                _note(log, f"{task} reprogram epoch {epoch} step {step}/{len(train_loader)} loss {loss_text}")
-        score, val_metrics = _score_reprogram(
-            base, head, reprogram, val_loader, validation, names, binary, device, None
+                _note(log, f"{task} align epoch {epoch} step {step}/{len(train_loader)} loss {loss_text}")
+        score, val_metrics = _score_align(
+            base, head, align, val_loader, validation, names, binary, device, None
         )
-        _note(log, f"{task} reprogram epoch {epoch} ds1-val {score:.4f}")
+        _note(log, f"{task} align epoch {epoch} ds1-val {score:.4f}")
         if score > best_score:
             best_score = score
             best = {"epoch": epoch, "classes": names, "ds1_val": val_metrics}
             best_blob = {
-                "reprogram": {key: value.detach().cpu().clone() for key, value in reprogram.state_dict().items()},
+                "align": {key: value.detach().cpu().clone() for key, value in align.state_dict().items()},
                 "head": {key: value.detach().cpu().clone() for key, value in head.state_dict().items()},
                 "lora": {
                     key: value.detach().cpu().clone()
@@ -223,24 +223,24 @@ def _train_reprogram(
                     if "lora_" in key
                 },
             }
-    saved_reprogram = best_blob["reprogram"]
+    saved_align = best_blob["align"]
     saved_head = best_blob["head"]
     saved_lora = best_blob["lora"]
-    if not isinstance(saved_reprogram, dict) or not isinstance(saved_head, dict) or not isinstance(saved_lora, dict):
-        raise TypeError("missing reprogram snapshot")
-    reprogram.load_state_dict({key: value.to(device) for key, value in saved_reprogram.items()})
+    if not isinstance(saved_align, dict) or not isinstance(saved_head, dict) or not isinstance(saved_lora, dict):
+        raise TypeError("missing align snapshot")
+    align.load_state_dict({key: value.to(device) for key, value in saved_align.items()})
     head.load_state_dict({key: value.to(device) for key, value in saved_head.items()})
     base.load_state_dict(saved_lora, strict=False)
     selection = best["ds1_val"]
     if not isinstance(selection, dict):
         raise TypeError("missing validation snapshot")
-    _, test_metrics = _score_reprogram(
-        base, head, reprogram, test_loader, test, names, binary, device, selection
+    _, test_metrics = _score_align(
+        base, head, align, test_loader, test, names, binary, device, selection
     )
     best["ds2"] = test_metrics
     key = "auc" if binary else "macro_auc"
-    _note(log, f"{task} reprogram ds2 {float(test_metrics[key]):.4f}")  # type: ignore[arg-type]
-    del base, head, reprogram, opt
+    _note(log, f"{task} align ds2 {float(test_metrics[key]):.4f}")  # type: ignore[arg-type]
+    del base, head, align, opt
     if device == "cuda":
         torch.cuda.empty_cache()
     return best
@@ -252,12 +252,12 @@ def _dump(dest: Path, payload: dict[str, object]) -> None:
 
 
 def main() -> None:
-    """Train both external arms and write ``results/external_qwen.json``."""
+    """Train both adapted arms and write ``results/adapted_qwen.json``."""
     data_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "data/mitdb")
     model_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "models/Qwen2.5-1.5B")
     train_qwen.MODEL = str(model_dir)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    log = Path("runs/external.log")
+    log = Path("runs/adapted.log")
     log.parent.mkdir(parents=True, exist_ok=True)
     frame, windows = load_beats(data_dir)
     frame["beat_index"] = np.arange(len(frame))
@@ -267,14 +267,14 @@ def main() -> None:
     del quantizer
     if device == "cuda":
         torch.cuda.empty_cache()
-    dest = Path("results/external_qwen.json")
+    dest = Path("results/adapted_qwen.json")
     payload: dict[str, object] = {
         "epochs": train_qwen.EPOCHS,
         "quantizer_epochs": RECON_EPOCHS,
         "frames": FRAMES,
         "note": (
             "FSQ is a one-lead fixed-scale quantizer trained to reconstruct DS1 beats, "
-            "then classified like the named tokens. Reprogramming cross-attends 13 patches "
+            "then classified like the named tokens. Input alignment cross-attends 13 patches "
             "to 64 frozen Qwen embedding rows. Neither arm is a full reproduction of HeartLLM or TIME-LLM."
         ),
         "tasks": {},
@@ -288,8 +288,8 @@ def main() -> None:
         _note(log, f"start {task} fsq")
         tasks[task]["arms"]["fsq"] = train_qwen._train_one(frame, task, "fsq", device)
         _dump(dest, payload)
-        _note(log, f"start {task} reprogram")
-        tasks[task]["arms"]["reprogram"] = _train_reprogram(frame, windows, task, device, log)
+        _note(log, f"start {task} align")
+        tasks[task]["arms"]["align"] = _train_align(frame, windows, task, device, log)
         _dump(dest, payload)
     print(f"wrote {dest}", flush=True)
 

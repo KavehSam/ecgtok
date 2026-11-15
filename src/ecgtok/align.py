@@ -1,4 +1,4 @@
-"""Patch reprogramming into a frozen language-model space.
+"""Align beat patches to a frozen language-model input space.
 
 TIME-LLM embeds short patches and cross-attends them to text prototypes taken
 from the language model. Here the prototypes are a fixed sample of Qwen's
@@ -16,7 +16,7 @@ FRAMES = 13
 PROTOTYPES = 64
 
 
-class PatchReprogram(nn.Module):
+class PatchAlign(nn.Module):
     """Map a beat window to one vector per patch, in the language-model width."""
 
     def __init__(self, hidden: int, heads: int = 4, prototypes: int = PROTOTYPES) -> None:

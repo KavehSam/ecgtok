@@ -17,4 +17,6 @@ Polarity compares the positive and negative peaks inside the QRS. A notch is two
 
 Each clause is wrapped as one token, for example `<QRS_WIDE>` or `<ST_ISOELECTRIC>`. The bins are coarse on purpose. They are the distinctions a reading already makes, not a reconstruction of the waveform.
 
-The opaque control uses the same window and a similar number of tokens, with no clinical names. The window is split into twelve equal segments. Each token is the RMS of one segment, in tenths of a millivolt, clipped at 5.0 mV: `<B00_n>` through `<B11_n>`. The language model, the split, and the labels stay the same, so a difference in score is a difference in the input. The MIT-BIH results are in the README.
+The opaque control uses the same window and a similar number of tokens, with no clinical names. The window is split into twelve equal segments. Each token is the RMS of one segment, in tenths of a millivolt, clipped at 5.0 mV: `<B00_n>` through `<B11_n>`. The language model, the split, and the labels stay the same, so a difference in score is a difference in the input.
+
+Two further inputs use this same window and are not part of the token list. Fixed-scale codes quantize a learned latent into 13 integers. Input alignment maps raw patches into Qwen by cross-attention to frozen embedding rows. Both are specified in [adapted.md](adapted.md). The MIT-BIH scores, including those two inputs, are in the README.

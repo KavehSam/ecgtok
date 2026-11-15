@@ -1,7 +1,7 @@
 import torch
 
+from ecgtok.align import FRAMES, PATCH, PatchAlign
 from ecgtok.fsq import VOCAB, fsq_ids
-from ecgtok.reprogram import FRAMES, PATCH, PatchReprogram
 
 
 def test_fsq_ids_use_base_k_digits() -> None:
@@ -21,9 +21,9 @@ def test_fsq_straight_through_carries_gradient() -> None:
     assert torch.isfinite(latent.grad).all()
 
 
-def test_reprogram_keeps_prototypes_fixed() -> None:
+def test_align_keeps_prototypes_fixed() -> None:
     hidden = 32
-    model = PatchReprogram(hidden)
+    model = PatchAlign(hidden)
     model.prototypes.copy_(torch.randn(model.prototypes.shape))
     windows = torch.randn(3, FRAMES * PATCH)
     out = model(windows)
