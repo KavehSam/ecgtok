@@ -22,12 +22,26 @@ DS2_RECORDS = frozenset(
 
 
 def record_key(value: object) -> str:
-    """Record name with surrounding whitespace removed."""
+    """Normalize a record name for split lookup.
+
+    Args:
+        value: Record name from a dataframe column.
+
+    Returns:
+        The stripped string form of ``value``.
+    """
     return str(value).strip()
 
 
 def de_chazal_group(value: object) -> str | None:
-    """``DS1``, ``DS2``, or ``None`` for a paced record or a name outside the split."""
+    """Assign a record to DS1, DS2, or exclude paced/unknown records.
+
+    Args:
+        value: Record name to classify.
+
+    Returns:
+        ``"DS1"``, ``"DS2"``, or ``None`` when the record is paced or unknown.
+    """
     key = record_key(value)
     if key in DS1_RECORDS:
         return "DS1"
@@ -39,10 +53,17 @@ def de_chazal_group(value: object) -> str | None:
 def split_ds1_ds2(
     frame: pd.DataFrame, val_fraction: float = 0.15
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Train and validation are DS1. Test is DS2.
+    """Split beats into DS1 train, DS1 validation tail, and DS2 test.
 
-    Validation is the last fraction of each DS1 record in time. DS2 is not
-    used to choose an epoch or a threshold.
+    Args:
+        frame: Beat table with ``record_name`` and ``timestamp_ms``.
+        val_fraction: Fraction of each DS1 record held out at the end in time.
+
+    Returns:
+        ``(train, validation, test)`` dataframes.
+
+    Raises:
+        ValueError: When ``val_fraction`` is not in ``(0, 0.5)``.
     """
     if not 0 < val_fraction < 0.5:
         raise ValueError("val_fraction must be between 0 and 0.5")

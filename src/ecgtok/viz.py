@@ -25,7 +25,14 @@ from ecgtok.windows import (
 
 @dataclass(frozen=True)
 class BeatVizPayload:
-    """Everything needed to draw one beat and print its token string."""
+    """Data passed from loading to figure rendering.
+
+    Attributes:
+        window: Filtered beat samples centered on R.
+        tokens: Named token tuple for the beat.
+        meta: Human-readable caption for plots.
+        lead_name: WFDB lead name used for the waveform.
+    """
 
     window: np.ndarray
     tokens: tuple[str, ...]
@@ -34,12 +41,31 @@ class BeatVizPayload:
 
 
 def lead_names(record: object) -> list[str]:
-    """Return WFDB signal names for ``record``, in channel order."""
+    """List WFDB signal names on a record.
+
+    Args:
+        record: WFDB record object with ``sig_name``.
+
+    Returns:
+        Lead names in channel order.
+    """
     return [str(name).strip() for name in (getattr(record, "sig_name", None) or [])]
 
 
 def resolve_lead_index(record: object, *, lead: str | None, lead_index: int | None) -> tuple[int, str]:
-    """Map ``lead`` or ``lead_index`` to ``(channel_index, lead_name)``."""
+    """Resolve a lead by name or channel index.
+
+    Args:
+        record: WFDB record object.
+        lead: Lead name when ``lead_index`` is ``None``.
+        lead_index: WFDB channel index; overrides ``lead`` when set.
+
+    Returns:
+        ``(channel_index, lead_name)``.
+
+    Raises:
+        ValueError: When the record has no leads or the lead is unknown.
+    """
     names = lead_names(record)
     if not names:
         raise ValueError("Record has no leads")
@@ -56,7 +82,14 @@ def resolve_lead_index(record: object, *, lead: str | None, lead_index: int | No
 
 
 def _aami_beats(annotation: object) -> list[tuple[int, str, int]]:
-    """Keep AAMI-mapped QRS annotations as ``(sample, symbol, aami)`` tuples."""
+    """List AAMI-mapped beats from one annotation file.
+
+    Args:
+        annotation: WFDB ``.atr`` annotation object.
+
+    Returns:
+        ``(sample, symbol, aami)`` for every mappable QRS beat.
+    """
     kept: list[tuple[int, str, int]] = []
     for sample, symbol in zip(annotation.sample, annotation.symbol, strict=True):
         aami = symbol_to_aami(symbol or "")
@@ -72,7 +105,19 @@ def resolve_beat_sample(
     *,
     tolerance_samples: int = 2,
 ) -> tuple[int, str, int]:
-    """Return ``(sample, symbol, aami)`` for the beat nearest ``timestamp_ms``."""
+    """Match a beat annotation to a wall-clock timestamp.
+
+    Args:
+        annotation: WFDB ``.atr`` annotation object.
+        timestamp_ms: Beat time in milliseconds.
+        tolerance_samples: Maximum sample offset allowed.
+
+    Returns:
+        ``(sample, symbol, aami)`` for the nearest beat.
+
+    Raises:
+        ValueError: When no suitable beat exists within tolerance.
+    """
     target = int(round(timestamp_ms * FS / 1000.0))
     best: tuple[int, str, int] | None = None
     best_distance = tolerance_samples + 1
@@ -99,7 +144,21 @@ def load_beat_for_viz(
     lead: str | None = "MLII",
     lead_index: int | None = None,
 ) -> BeatVizPayload:
-    """Load one beat window and the named token tuple from MIT-BIH files under ``data_dir``."""
+    """Load waveform and named tokens for one annotated beat.
+
+    Args:
+        data_dir: MIT-BIH root directory.
+        record_name: Record id such as ``"208"``.
+        timestamp_ms: Beat time in milliseconds.
+        lead: Lead name when ``lead_index`` is ``None``.
+        lead_index: WFDB channel index; overrides ``lead`` when set.
+
+    Returns:
+        A ``BeatVizPayload`` ready for plotting.
+
+    Raises:
+        ValueError: When the beat or window cannot be resolved.
+    """
     record_path = data_dir / record_name
     record = wfdb.rdrecord(str(record_path))
     channel, lead_name = resolve_lead_index(record, lead=lead, lead_index=lead_index)
@@ -137,7 +196,14 @@ def load_beat_for_viz(
 
 
 def token_group(token: str) -> str:
-    """Assign a display color group. Tokens are ``<NAME>`` clauses."""
+    """Map one token to a plot legend group.
+
+    Args:
+        token: Named token such as ``<QRS_WIDE>``.
+
+    Returns:
+        ``"morphology"`` or ``"timing"``.
+    """
     inner = token.strip("<>").lower()
     if inner.startswith(("beat_", "timing_", "full_", "incomplete_", "interpolated_", "pause_")):
         return "timing"
@@ -159,7 +225,16 @@ def render_beat_figure(
     *,
     show: bool = False,
 ) -> None:
-    """Write a waveform plus token strip using matplotlib."""
+    """Save a waveform and token strip figure.
+
+    Args:
+        payload: Beat data from ``load_beat_for_viz``.
+        out_path: Destination image path.
+        show: When ``True``, open an interactive matplotlib window.
+
+    Returns:
+        None.
+    """
     import matplotlib.pyplot as plt
 
     window = payload.window

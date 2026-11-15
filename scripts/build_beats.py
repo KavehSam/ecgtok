@@ -26,6 +26,15 @@ from ecgtok.windows import (
 
 
 def _lead_index(record: object, lead: str = "MLII") -> int | None:
+    """Find the WFDB channel index for a lead name.
+
+    Args:
+        record: WFDB record object.
+        lead: Lead name to match, case-insensitive.
+
+    Returns:
+        Channel index, or ``None`` when the lead is absent.
+    """
     names = getattr(record, "sig_name", None) or []
     for index, name in enumerate(names):
         if str(name).strip().upper() == lead:
@@ -34,7 +43,14 @@ def _lead_index(record: object, lead: str = "MLII") -> int | None:
 
 
 def build_table(data_dir: Path) -> pd.DataFrame:
-    """One row per AAMI-mapped MLII beat, with the named string and the opaque string."""
+    """Build the named and opaque token table for every MLII beat.
+
+    Args:
+        data_dir: MIT-BIH root directory.
+
+    Returns:
+        One row per beat with ``text_named`` and ``text_opaque`` columns.
+    """
     highpass, lowpass = design_bandpass(FS)
     rows: list[dict[str, object]] = []
     headers = sorted(data_dir.glob("*.hea"))
@@ -92,7 +108,14 @@ def build_table(data_dir: Path) -> pd.DataFrame:
 
 
 def main() -> None:
-    """Write the beat table to parquet. Arguments are the mitdb directory and the output path."""
+    """Write ``cache/beats.parquet`` from command-line paths.
+
+    Args:
+        None. Uses ``sys.argv[1]`` as the data directory and ``sys.argv[2]`` as the output path.
+
+    Returns:
+        None.
+    """
     source = Path(sys.argv[1] if len(sys.argv) > 1 else "data/mitdb")
     dest = Path(sys.argv[2] if len(sys.argv) > 2 else "cache/beats.parquet")
     table = build_table(source)

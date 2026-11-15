@@ -30,16 +30,38 @@ TASKS = train_qwen.TASKS
 
 
 class WindowRows(Dataset):
-    """Beat windows aligned with a split frame through ``beat_index``."""
+    """Dataset of raw beat windows linked by ``beat_index``."""
 
     def __init__(self, frame: pd.DataFrame, windows: np.ndarray) -> None:
+        """Attach split rows to the shared window tensor.
+
+        Args:
+            frame: Split slice with ``beat_index`` and ``target`` columns.
+            windows: All beat windows stacked as ``float32``.
+
+        Returns:
+            None.
+        """
         self.frame = frame.reset_index(drop=True)
         self.windows = windows
 
     def __len__(self) -> int:
+        """Return the number of beats in the split.
+
+        Returns:
+            Row count of the split frame.
+        """
         return len(self.frame)
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
+        """Fetch one window and label.
+
+        Args:
+            index: Row index in the split frame.
+
+        Returns:
+            Dict with ``window`` and ``labels`` tensors.
+        """
         row = self.frame.iloc[index]
         beat = int(row["beat_index"])
         return {
@@ -49,12 +71,31 @@ class WindowRows(Dataset):
 
 
 def _note(log: Path, line: str) -> None:
+    """Append one line to stdout and the adapted training log.
+
+    Args:
+        log: Log file path, for example ``runs/adapted.log``.
+        line: Text to append.
+
+    Returns:
+        None.
+    """
     print(line, flush=True)
     with log.open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")
 
 
 def _train_quantizer(windows: np.ndarray, device: str, log: Path) -> BeatQuantizer:
+    """Fit the FSQ autoencoder on DS1 windows.
+
+    Args:
+        windows: Training windows as ``float32`` array.
+        device: Torch device string.
+        log: Path for reconstruction MSE logs.
+
+    Returns:
+        Trained ``BeatQuantizer`` in eval mode.
+    """
     model = BeatQuantizer().to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
     loss_fn = nn.MSELoss()
@@ -81,6 +122,16 @@ def _train_quantizer(windows: np.ndarray, device: str, log: Path) -> BeatQuantiz
 
 
 def _encode(model: BeatQuantizer, windows: np.ndarray, device: str) -> list[str]:
+    """Quantize every beat window to FSQ token strings.
+
+    Args:
+        model: Trained quantizer.
+        windows: All beat windows in database order.
+        device: Torch device string.
+
+    Returns:
+        One ``text_fsq`` string per window.
+    """
     texts: list[str] = []
     data = torch.tensor(windows, dtype=torch.float32)
     with torch.no_grad():
@@ -91,6 +142,19 @@ def _encode(model: BeatQuantizer, windows: np.ndarray, device: str) -> list[str]
 
 
 def _prototypes(base: nn.Module, count: int, device: str) -> torch.Tensor:
+    """Sample frozen Qwen embedding rows for cross-attention keys.
+
+    Args:
+        base: Qwen model with an input embedding table.
+        count: Number of prototype rows to keep.
+        device: Torch device for the returned tensor.
+
+    Returns:
+        Tensor of shape ``(count, hidden)``.
+
+    Raises:
+        RuntimeError: When fewer than ``count`` rows can be sampled.
+    """
     weight = base.get_input_embeddings().weight.detach()
     step = max(int(weight.shape[0]) // count, 1)
     chosen = weight[::step][:count].to(device=device, dtype=torch.float32)
@@ -106,6 +170,18 @@ def _align_logits(
     windows: torch.Tensor,
     device: str,
 ) -> torch.Tensor:
+    """Forward aligned patches and pool the last frame.
+
+    Args:
+        base: LoRA-wrapped Qwen encoder.
+        head: Task linear head.
+        align: ``PatchAlign`` module.
+        windows: Batch of raw beat windows.
+        device: Torch device string.
+
+    Returns:
+        Logits of shape ``(batch, n_out)``.
+    """
     embeds = align(windows.to(device))
     dtype = base.get_input_embeddings().weight.dtype
     mask = torch.ones(embeds.shape[:2], dtype=torch.long, device=device)
@@ -124,6 +200,22 @@ def _score_align(
     device: str,
     selection: dict[str, object] | None,
 ) -> tuple[float, dict[str, object]]:
+    """Score one split for the alignment arm.
+
+    Args:
+        base: LoRA-wrapped Qwen encoder.
+        head: Task linear head.
+        align: ``PatchAlign`` module.
+        loader: DataLoader for the split.
+        frame: Beat frame aligned with ``loader``.
+        names: Multiclass label names.
+        binary: When ``True``, compute binary metrics.
+        device: Torch device string.
+        selection: Fixed validation metrics for thresholding, if any.
+
+    Returns:
+        ``(score, metrics_dict)`` for the split.
+    """
     base.eval()
     head.eval()
     align.eval()
@@ -160,6 +252,18 @@ def _train_align(
     device: str,
     log: Path,
 ) -> dict[str, object]:
+    """Train patch alignment and score DS1 validation and DS2 test.
+
+    Args:
+        frame: Full beat table with ``beat_index``.
+        windows: All windows aligned with ``frame`` rows.
+        task: Task name shared with ``train_qwen``.
+        device: Torch device string.
+        log: Path for training logs.
+
+    Returns:
+        Best-epoch metrics for the alignment arm.
+    """
     train_qwen._seed(42)
     binary = task == "ventricular"
     train, validation, test, names = train_qwen._prepare(frame, train_qwen.LABEL[task], binary)
@@ -247,12 +351,28 @@ def _train_align(
 
 
 def _dump(dest: Path, payload: dict[str, object]) -> None:
+    """Write JSON results atomically to disk.
+
+    Args:
+        dest: Output JSON path.
+        payload: Serializable results dict.
+
+    Returns:
+        None.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def main() -> None:
-    """Train both adapted arms and write ``results/adapted_qwen.json``."""
+    """Train FSQ and alignment arms on MIT-BIH beats.
+
+    Args:
+        None. Uses ``sys.argv[1]`` for the data directory and ``sys.argv[2]`` for the model path.
+
+    Returns:
+        None. Writes ``results/adapted_qwen.json``.
+    """
     data_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "data/mitdb")
     model_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "models/Qwen2.5-1.5B")
     train_qwen.MODEL = str(model_dir)

@@ -9,13 +9,36 @@ from scipy.signal import find_peaks
 
 
 def ms_to_samples(ms: float, fs: int) -> int:
-    """Duration in milliseconds converted to samples at ``fs``."""
+    """Convert a duration to an integer sample count.
+
+    Args:
+        ms: Duration in milliseconds.
+        fs: Sample rate in hertz.
+
+    Returns:
+        Rounded sample count at ``fs``.
+    """
     return int(round(ms / 1000.0 * fs))
 
 
 @dataclass
 class BeatFiducials:
-    """Sample indices of P, QRS, T, and a retrograde P on one beat window."""
+    """Sample indices and baseline for one beat-centered window.
+
+    Attributes:
+        r_idx: R peak sample index.
+        p_peak: P-wave peak index, if detected.
+        p_on: P-wave onset index, if detected.
+        p_off: P-wave offset index, if detected.
+        qrs_on: QRS onset sample index.
+        qrs_off: QRS offset sample index.
+        t_peak: T-wave peak index, if detected.
+        t_on: T-wave onset index, if detected.
+        t_off: T-wave offset index, if detected.
+        retrograde_p: Retrograde P peak index, if detected.
+        baseline: Isoelectric level in millivolts.
+    """
+
     r_idx: int
     p_peak: int | None
     p_on: int | None
@@ -30,6 +53,15 @@ class BeatFiducials:
 
 
 def _baseline(sig: np.ndarray, r_idx: int) -> float:
+    """Estimate local baseline just before the R peak.
+
+    Args:
+        sig: Beat window samples.
+        r_idx: R peak index inside ``sig``.
+
+    Returns:
+        Median baseline level in millivolts.
+    """
     pre = sig[max(0, r_idx - 40) : max(0, r_idx - 10)]
     if len(pre) < 5:
         pre = sig[: max(1, r_idx)]
@@ -37,6 +69,15 @@ def _baseline(sig: np.ndarray, r_idx: int) -> float:
 
 
 def _qrs_bounds(x: np.ndarray, r_idx: int) -> tuple[int, int]:
+    """Locate QRS onset and offset from the derivative envelope.
+
+    Args:
+        x: Beat window samples.
+        r_idx: R peak index inside ``x``.
+
+    Returns:
+        Inclusive ``(qrs_on, qrs_off)`` sample indices.
+    """
     n = len(x)
     win = min(45, r_idx, n - r_idx - 1)
     lo = max(0, r_idx - win)
@@ -54,6 +95,14 @@ def _qrs_bounds(x: np.ndarray, r_idx: int) -> tuple[int, int]:
 
 
 def _signed_peak(segment: np.ndarray) -> tuple[int, float] | None:
+    """Pick the largest positive or negative peak in a segment.
+
+    Args:
+        segment: One-dimensional samples.
+
+    Returns:
+        ``(index, amplitude)`` for the dominant peak, or ``None`` when empty.
+    """
     if len(segment) < 5:
         return None
     candidates: list[tuple[int, float]] = []
@@ -71,7 +120,16 @@ def _signed_peak(segment: np.ndarray) -> tuple[int, float] | None:
 
 
 def delineate_beat(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) -> BeatFiducials:
-    """Locate the fiducials. The baseline is the median of the samples just before the R peak."""
+    """Detect P, QRS, and T fiducials on one beat window.
+
+    Args:
+        sig: Beat window samples in millivolts.
+        fs: Sample rate in hertz.
+        r_idx: R peak index; defaults to the window center.
+
+    Returns:
+        A ``BeatFiducials`` structure for the window.
+    """
     x = np.asarray(sig, dtype=np.float64).ravel()
     n = len(x)
     if r_idx is None:
@@ -100,6 +158,17 @@ def delineate_beat(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) 
 def _find_p(
     x: np.ndarray, baseline: float, qrs_on: int, fs: int
 ) -> tuple[int | None, int | None, int | None]:
+    """Search for P wave before QRS onset.
+
+    Args:
+        x: Full beat window.
+        baseline: Isoelectric level.
+        qrs_on: QRS onset index.
+        fs: Sample rate in hertz.
+
+    Returns:
+        ``(p_peak, p_on, p_off)`` indices, each possibly ``None``.
+    """
     search_end = max(0, qrs_on - ms_to_samples(40, fs))
     search_start = max(0, qrs_on - ms_to_samples(280, fs))
     if search_end <= search_start + 5:
@@ -116,6 +185,17 @@ def _find_p(
 def _find_t(
     x: np.ndarray, baseline: float, qrs_off: int, fs: int
 ) -> tuple[int | None, int | None, int | None]:
+    """Search for T wave after QRS offset.
+
+    Args:
+        x: Full beat window.
+        baseline: Isoelectric level.
+        qrs_off: QRS offset index.
+        fs: Sample rate in hertz.
+
+    Returns:
+        ``(t_peak, t_on, t_off)`` indices, each possibly ``None``.
+    """
     search_start = min(len(x) - 1, qrs_off + ms_to_samples(80, fs))
     search_end = min(len(x), qrs_off + ms_to_samples(500, fs))
     if search_end <= search_start + 5:
@@ -134,6 +214,18 @@ def _find_retrograde(
     t_peak: int | None,
     fs: int,
 ) -> int | None:
+    """Search for a retrograde P between QRS end and T peak.
+
+    Args:
+        x: Full beat window.
+        baseline: Isoelectric level.
+        qrs_off: QRS offset index.
+        t_peak: T peak index, used to cap the search window.
+        fs: Sample rate in hertz.
+
+    Returns:
+        Retrograde P peak index, or ``None`` when not found.
+    """
     search_start = qrs_off + ms_to_samples(40, fs)
     search_end = qrs_off + ms_to_samples(220, fs)
     if t_peak is not None and search_start < t_peak < search_end:
