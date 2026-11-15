@@ -17,4 +17,4 @@ Polarity compares the positive and negative peaks inside the QRS. A notch is two
 
 Each clause is wrapped as one token, for example `<QRS_WIDE>` or `<ST_ISOELECTRIC>`. The bins are coarse on purpose. They are the distinctions a reading already makes, not a reconstruction of the waveform.
 
-The opaque control, added in the following change, replaces this string with energy bins of the same window. The language model, the split, and the labels stay the same, so a difference in score is a difference in the input.
+The opaque control uses the same window and a similar number of tokens, with no clinical names. The window is split into twelve equal segments. Each token is the RMS of one segment, in tenths of a millivolt, clipped at 5.0 mV: `<B00_n>` through `<B11_n>`. The language model, the split, and the labels stay the same, so a difference in score is a difference in the input. The MIT-BIH results are in the README.

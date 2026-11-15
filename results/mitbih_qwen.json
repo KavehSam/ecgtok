@@ -1,0 +1,104 @@
+{
+  "model": "Qwen2.5-1.5B",
+  "lora": {"r": 16, "alpha": 32, "dropout": 0.05, "targets": ["q_proj", "v_proj"]},
+  "seed": 42,
+  "epochs_trained": 2,
+  "batch_size": 64,
+  "max_length": 24,
+  "note": "Seed-42 run. DS2 is the checkpoint selected on DS1 validation. Retraining can move the third decimal.",
+  "tasks": {
+    "ventricular": {
+      "f1": "positive class",
+      "named": {
+        "epoch": 2,
+        "threshold": 0.80,
+        "ds1_val": {"auc": 0.986, "sensitivity": 0.850, "ppv": 0.868, "f1": 0.859},
+        "ds2": {"auc": 0.969, "sensitivity": 0.859, "ppv": 0.523, "f1": 0.650}
+      },
+      "opaque": {
+        "epoch": 2,
+        "threshold": 0.85,
+        "ds1_val": {"auc": 0.946, "sensitivity": 0.702, "ppv": 0.609, "f1": 0.652},
+        "ds2": {"auc": 0.929, "sensitivity": 0.704, "ppv": 0.397, "f1": 0.508}
+      }
+    },
+    "aami5": {
+      "f1": "macro over classes with both positives and negatives",
+      "named": {
+        "epoch": 1,
+        "ds1_val": {"macro_auc": 0.784, "macro_f1": 0.515, "classes_scored": ["F", "N", "S", "V"]},
+        "ds2": {
+          "macro_auc": 0.771,
+          "macro_f1": 0.337,
+          "classes_scored": ["F", "N", "Q", "S", "V"],
+          "per_class_auc": {"F": 0.865, "N": 0.789, "Q": 0.776, "S": 0.483, "V": 0.939}
+        }
+      },
+      "opaque": {
+        "epoch": 2,
+        "ds1_val": {"macro_auc": 0.827, "macro_f1": 0.429, "classes_scored": ["F", "N", "S", "V"]},
+        "ds2": {
+          "macro_auc": 0.685,
+          "macro_f1": 0.263,
+          "classes_scored": ["F", "N", "Q", "S", "V"],
+          "per_class_auc": {"F": 0.606, "N": 0.795, "Q": 0.452, "S": 0.667, "V": 0.906}
+        }
+      }
+    },
+    "symbols": {
+      "f1": "macro over classes with both positives and negatives",
+      "named": {
+        "epoch": 2,
+        "ds1_val": {"macro_auc": 0.834, "macro_f1": 0.351, "n_classes_scored": 9},
+        "ds2": {"macro_auc": 0.679, "macro_f1": 0.220, "n_classes_scored": 10, "unscored": ["S"]}
+      },
+      "opaque": {
+        "epoch": 2,
+        "ds1_val": {"macro_auc": 0.845, "macro_f1": 0.349, "n_classes_scored": 9},
+        "ds2": {"macro_auc": 0.611, "macro_f1": 0.143, "n_classes_scored": 10, "unscored": ["S"]}
+      }
+    },
+    "rhythm": {
+      "f1": "macro over classes with both positives and negatives",
+      "named": {
+        "epoch": 2,
+        "ds1_val": {"macro_auc": 0.719, "macro_f1": 0.218, "n_classes_scored": 9},
+        "ds2": {
+          "macro_auc": 0.712,
+          "macro_f1": 0.156,
+          "n_classes_scored": 8,
+          "per_class_auc": {
+            "AFIB": 0.794,
+            "AFL": 0.754,
+            "VT": 0.895,
+            "B": 0.828,
+            "N": 0.711,
+            "NOD": 0.663,
+            "SVTA": 0.604,
+            "T": 0.443
+          }
+        }
+      },
+      "opaque": {
+        "epoch": 2,
+        "ds1_val": {"macro_auc": 0.826, "macro_f1": 0.321, "n_classes_scored": 9},
+        "ds2": {
+          "macro_auc": 0.614,
+          "macro_f1": 0.124,
+          "n_classes_scored": 8,
+          "per_class_auc": {
+            "AFIB": 0.660,
+            "AFL": 0.509,
+            "VT": 0.710,
+            "B": 0.665,
+            "N": 0.672,
+            "NOD": 0.527,
+            "SVTA": 0.589,
+            "T": 0.578
+          }
+        }
+      },
+      "absent": "Ventricular flutter annotations do not fall on QRS beats in this table, so VFL is not a class."
+    }
+  }
+}
