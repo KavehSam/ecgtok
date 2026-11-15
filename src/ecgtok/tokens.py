@@ -19,6 +19,7 @@ def named_beat_tokens(
     rr_next_ms: float | None,
     rr_baseline_ms: float | None,
 ) -> tuple[str, ...]:
+    """Uppercase clauses wrapped as single tokens, for example ``<QRS_WIDE>``."""
     feat = beat_features(np.asarray(window, dtype=np.float64), fs=fs, r_idx=r_idx)
     clauses = named_clauses(
         feat,

@@ -9,11 +9,13 @@ from scipy.signal import find_peaks
 
 
 def ms_to_samples(ms: float, fs: int) -> int:
+    """Duration in milliseconds converted to samples at ``fs``."""
     return int(round(ms / 1000.0 * fs))
 
 
 @dataclass
 class BeatFiducials:
+    """Sample indices of P, QRS, T, and a retrograde P on one beat window."""
     r_idx: int
     p_peak: int | None
     p_on: int | None
@@ -69,6 +71,7 @@ def _signed_peak(segment: np.ndarray) -> tuple[int, float] | None:
 
 
 def delineate_beat(sig: np.ndarray, *, fs: int = 360, r_idx: int | None = None) -> BeatFiducials:
+    """Locate the fiducials. The baseline is the median of the samples just before the R peak."""
     x = np.asarray(sig, dtype=np.float64).ravel()
     n = len(x)
     if r_idx is None:

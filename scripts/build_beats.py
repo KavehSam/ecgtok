@@ -34,6 +34,7 @@ def _lead_index(record: object, lead: str = "MLII") -> int | None:
 
 
 def build_table(data_dir: Path) -> pd.DataFrame:
+    """One row per AAMI-mapped MLII beat, with the named string and the opaque string."""
     highpass, lowpass = design_bandpass(FS)
     rows: list[dict[str, object]] = []
     headers = sorted(data_dir.glob("*.hea"))
@@ -91,6 +92,7 @@ def build_table(data_dir: Path) -> pd.DataFrame:
 
 
 def main() -> None:
+    """Write the beat table to parquet. Arguments are the mitdb directory and the output path."""
     source = Path(sys.argv[1] if len(sys.argv) > 1 else "data/mitdb")
     dest = Path(sys.argv[2] if len(sys.argv) > 2 else "cache/beats.parquet")
     table = build_table(source)

@@ -44,16 +44,21 @@ def _seed(seed: int = 42) -> None:
 
 
 class BeatRows(Dataset):
+    """One beat string, packed to the model length, with its task label."""
+
     def __init__(self, frame: pd.DataFrame, tokenizer: AutoTokenizer, column: str, unk_id: int) -> None:
+        """Keep the frame, the tokenizer, and the id used for an unseen token."""
         self.rows = frame.reset_index(drop=True)
         self.tokenizer = tokenizer
         self.column = column
         self.unk_id = unk_id
 
     def __len__(self) -> int:
+        """Number of beats."""
         return len(self.rows)
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
+        """Token ids, attention mask, and the label at this row."""
         row = self.rows.iloc[index]
         token_ids = [
             resolve_id(self.tokenizer.convert_tokens_to_ids(token), self.unk_id)
@@ -270,6 +275,7 @@ def _evaluate(
 
 
 def main() -> None:
+    """Train both arms of every task and write ``runs/qwen_mitbih.json``."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     frame = pd.read_parquet(Path(sys.argv[1] if len(sys.argv) > 1 else "cache/beats.parquet"))
     dest = Path("runs/qwen_mitbih.json")
